@@ -1,0 +1,12 @@
+Uuid: 404965964a5b402d975b19da5f0abeec
+ExtensionType: 2
+Name: Add & Track Custom Issues
+RepoName: add-track-custom-issues
+ScreenVersion: 1.0
+SerialVersion: 0
+MinPlatformVersion: 0
+ProOnly: True
+Author: James Morris
+ShortDescription: Create custom issues in Burp Scanner results, using predefined issue templates.
+EntryPoint: Add & Track Custom Issues.py
+BuildCommand: 
