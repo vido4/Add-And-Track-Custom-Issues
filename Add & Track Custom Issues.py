@@ -54,7 +54,6 @@ import csv # for importing and exporting to and from csv
 import json # for importing and exporting to and from json
 import os # for splitting the file name and file extension when importing and exporting
 
-
 #
 # Burp extender main class
 #
@@ -231,15 +230,38 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		# return
 		return
 
-
 	#
-	# create text areas, text panes, scroll panes, and panels
+	# Create new scroll pane (with suffix indicating position in tab) and add to existing tab pane
 	#
+	def createAndAddScrollPaneToExistingTabbedPanel(self, textType, editable, tabName, rowHeight, shortName):
+		longName = tabName + " " + shortName
 
-	def createTextAndScrollPaneAndPanel(self, textType, editable, tabName, rowHeight, shortName):
+		tabPane = self._dictionaryOfPanels[longName].getComponents()[0]
+
+		nextShortName = shortName + str(tabPane.getTabCount() + 1)
+		nextLongName = tabName + " " + nextShortName
+
+		self.createTextAndScrollPane(textType, editable, nextLongName, rowHeight, nextShortName)
+		tabPane.addTab(nextShortName, self._dictionaryOfScrollPanes[nextLongName])
+
+		return
+
+
+	def createTextAndScrollPaneAndPanel(self, textType, editable, tabName, rowHeight, shortName, tabbed = False):
 
 		# create unique name for dictionary items
 		longName = tabName + " " + shortName
+
+		self.createTextAndScrollPane(textType, editable, longName, rowHeight, shortName)
+		self.addScrollPaneToPanel(shortName, longName, tabbed)
+		# return
+		return
+
+
+	#
+	# create text areas, text panes and scroll panes
+	#
+	def createTextAndScrollPane(self, textType, editable, longName, rowHeight, shortName):
 
 		# check if the type is a text area
 		if textType == "TextArea":
@@ -266,13 +288,11 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 			# check if port
 			if shortName == "Port":
-
-				# set default port to 443 to match default protocol of https 
+				# set default port to 443 to match default protocol of https
 				self._dictionaryOfTextAreas[longName].setText("443")
 
 			# check if issue name, port, host, or path
 			if shortName == "Issue Name" or shortName == "Port" or shortName == "Host" or shortName == "Path":
-
 				# disable newlines
 				self._dictionaryOfTextAreas[longName].getDocument().putProperty("filterNewlines", True)
 
@@ -281,13 +301,11 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 			# check if text area is for port, host, or path
 			if shortName == "Port" or shortName == "Host" or shortName == "Path":
-
 				# add listener to text areas to build issue location as text is entered
 				self._dictionaryOfTextAreas[longName].getDocument().addDocumentListener(CustomDocumentListener(self))
 
 			# check if issue name, port, or host
 			if shortName == "Issue Name" or shortName == "Port" or shortName == "Host":
-
 				# store the default border in case border is turned red for missing information
 				self._dictionaryOfScrollPaneBorders[longName] = self._dictionaryOfScrollPanes[longName].getBorder()
 
@@ -315,7 +333,8 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 			self._dictionaryOfTextPanes[longName].setContentType("text/html")
 
 			# set text in text pane
-			self._dictionaryOfTextPanes[longName].setText(self._HTML_FOR_TEXT_PANES[0] + "&nbsp" + self._HTML_FOR_TEXT_PANES[1])
+			self._dictionaryOfTextPanes[longName].setText(
+				self._HTML_FOR_TEXT_PANES[0] + "&nbsp" + self._HTML_FOR_TEXT_PANES[1])
 
 			# remove default white border
 			self._dictionaryOfTextPanes[longName].setBorder(BorderFactory.createEmptyBorder())
@@ -325,26 +344,41 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 			# check if text pane is not editable
 			if editable == "editableN":
-
 				# set to read only
 				self._dictionaryOfTextPanes[longName].setEditable(False)
 
 				# set disabled background color
 				self._dictionaryOfTextPanes[longName].setBackground(self._DISABLED_BACKGROUND_COLOR)
 
+		# return
+		return
+
+
+	#
+	# create panel and add existing scroll pane
+	#
+
+	def addScrollPaneToPanel(self, shortName, longName, tabbed):
 		# create panels
 		self._dictionaryOfPanels[longName] = JPanel()
 
 		# set border for panels
-		self._dictionaryOfPanels[longName].setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.BLACK, 1, False), shortName, TitledBorder.CENTER, TitledBorder.TOP))
+		self._dictionaryOfPanels[longName].setBorder(
+			BorderFactory.createTitledBorder(BorderFactory.createLineBorder(Color.BLACK, 1, False), shortName,
+											 TitledBorder.CENTER, TitledBorder.TOP))
 
 		# set layout for panels
 		self._dictionaryOfPanels[longName].setLayout(BorderLayout())
 
-		# add scroll panes to panels
-		self._dictionaryOfPanels[longName].add(self._dictionaryOfScrollPanes[longName])
+		if tabbed:
+			self.tabPane = JTabbedPane()
+			self.tabPane.addTab(shortName, self._dictionaryOfScrollPanes[longName])
 
-		# return
+			self._dictionaryOfPanels[longName].add(self.tabPane)
+		else:
+			# add scroll panes to panels
+			self._dictionaryOfPanels[longName].add(self._dictionaryOfScrollPanes[longName])
+
 		return
 
 
@@ -442,7 +476,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 	#
 	# create labels warning that the table has changed since the last export
 	#
- 
+
 	def createWarningLabel(self, tabName, labelNumber):
 
 		# create label setting text to blank since hiding label does not consume the space
@@ -734,8 +768,12 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 4, "Issue Background")
 		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 4, "Remediation Detail")
 		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 4, "Remediation Background")
-		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 6, "Request")
-		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 6, "Response")
+		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 6, "Request", True)
+		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 6, "Response", True)
+
+		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", tabName, 6, "Request")
+		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", tabName, 6, "Response")
+		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", tabName, 6, "Response")
 
 		# create combo boxes and panels for main tab
 		self.createComboBoxAndPanel(tabName, "Severity")
@@ -1684,7 +1722,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 	def makeAddIssueDialogVisible(self):
 
 		# change focus to the add issue tab
-	 	self._tabbedPaneDialog.setSelectedIndex(0)
+		self._tabbedPaneDialog.setSelectedIndex(0)
 
 		# make the dialog box visible in case the click is coming from the main tab
 		self._dialogAddIssue.setVisible(True)
