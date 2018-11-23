@@ -56,6 +56,7 @@ import csv # for importing and exporting to and from csv
 import json # for importing and exporting to and from json
 import os # for splitting the file name and file extension when importing and exporting
 
+
 #
 # Burp extender main class
 #
@@ -148,9 +149,9 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		self._dictionaryOfLastSelectedRowsAndColumns = dict()
 
 		# popup menu for adding new requests/responses
-		self.menu = JPopupMenu()
-		self.menu.add(JMenuItem("Add Request/Response", actionPerformed=self.addNewRequestResponseTab))
-		self.menu.add(JMenuItem("Remove Last Request/Response", actionPerformed=self.removeLastRequestResponseTab))
+		menu = JPopupMenu()
+		menu.add(JMenuItem("Add Request/Response", actionPerformed=self.addNewRequestResponseTab))
+		menu.add(JMenuItem("Remove Last Request/Response", actionPerformed=self.removeLastRequestResponseTab))
 		self.popUpListener = self.ModifyRequestPopUpListener(self.menu)
 
 		# create main extension tab and issue selection tab for popup dialog
@@ -338,6 +339,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 			# check if port
 			if shortName == "Port":
+
 				# set default port to 443 to match default protocol of https
 				self._dictionaryOfTextAreas[longName].setText("443")
 
@@ -351,11 +353,13 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 			# check if text area is for port, host, or path
 			if shortName == "Port" or shortName == "Host" or shortName == "Path":
+
 				# add listener to text areas to build issue location as text is entered
 				self._dictionaryOfTextAreas[longName].getDocument().addDocumentListener(CustomDocumentListener(self))
 
 			# check if issue name, port, or host
 			if shortName == "Issue Name" or shortName == "Port" or shortName == "Host":
+
 				# store the default border in case border is turned red for missing information
 				self._dictionaryOfScrollPaneBorders[longName] = self._dictionaryOfScrollPanes[longName].getBorder()
 
@@ -375,7 +379,6 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 			if popUpListener is not None:
 				self._dictionaryOfTextAreas[longName].addMouseListener(popUpListener)
-				#self._dictionaryOfTextAreas[longName].addMouseListener(self.ModifyRequestPopUpListener(self.menu))
 
 		# check if the type is a text pane
 		elif textType == "TextPane":
@@ -398,6 +401,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 			# check if text pane is not editable
 			if editable == "editableN":
+
 				# set to read only
 				self._dictionaryOfTextPanes[longName].setEditable(False)
 
@@ -1233,18 +1237,8 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		requestTabPane = self._dictionaryOfPanels[self._DIALOG_TAB_1_NAME + " Request"].getComponent(0)
 
 		for requestPane, responsePane in zip(requestTabPane.getComponents(), responseTabPane.getComponents()):
-			print(type(requestPane
-							.getViewport()
-							.getView()))
-			requests.append(requestPane
-							.getViewport()
-							.getView()
-							.getText())
-
-			responses.append(responsePane
-							.getViewport()
-							.getView()
-							.getText())
+			requests.append(requestPane.getViewport().getView().getText())
+			responses.append(responsePane.getViewport().getView().getText())
 
 		# check if there is a value in the port field
 		if port != "":
