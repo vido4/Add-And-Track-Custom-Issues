@@ -50,6 +50,8 @@ from javax.swing.text import DocumentFilter # for applying filters on the issue 
 from javax.swing.text import SimpleAttributeSet # for centering text in disabled issue name and severity text panes
 from javax.swing.text import StyleConstants # for centering text in disabled issue name and severity text panes
 from javax.swing.undo import UndoManager # for undo and redo in text areas
+from javax.swing import JPopupMenu
+
 import csv # for importing and exporting to and from csv
 import json # for importing and exporting to and from json
 import os # for splitting the file name and file extension when importing and exporting
@@ -63,6 +65,29 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 	#
 	# implement IBurpExtender when the extension is loaded
 	#
+
+	# Listener for request/response popUp menu
+	# Need to implement all methods since Jython returns NonImplementedError on any not implemented method now
+	class ModifyRequestPopUpListener(MouseListener):
+		def __init__(self, popUpMenu):
+			self.popUp = popUpMenu
+
+		def mouseClicked(self, e):
+			pass
+
+		def mousePressed(self, e):
+			pass
+
+		def mouseEntered(self, e):
+			pass
+
+		def mouseExited(self, e):
+			pass
+
+		def mouseReleased(self, e):
+			if e.getButton() == e.BUTTON3:
+				self.popUp.show(e.getComponent(), e.getX(), e.getY())
+
 
 	def registerExtenderCallbacks(self, callbacks):
 
@@ -121,6 +146,12 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		self._dictionaryOfButtons = dict()
 		self._dictionaryOfLabels = dict()
 		self._dictionaryOfLastSelectedRowsAndColumns = dict()
+
+		# popup menu for adding new requests/responses
+		self.menu = JPopupMenu()
+		self.menu.add(JMenuItem("Add Request/Response", actionPerformed=self.addNewRequestResponseTab))
+		self.menu.add(JMenuItem("Remove Last Request/Response", actionPerformed=self.removeLastRequestResponseTab))
+		self.popUpListener = self.ModifyRequestPopUpListener(self.menu)
 
 		# create main extension tab and issue selection tab for popup dialog
 		self.createMainTabOrIssueSelectionTab(self._MAIN_TAB_NAME)
@@ -230,29 +261,48 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		# return
 		return
 
-	#
-	# Create new scroll pane (with suffix indicating position in tab) and add to existing tab pane
-	#
-	def createAndAddScrollPaneToExistingTabbedPanel(self, textType, editable, tabName, rowHeight, shortName):
+
+	def addNewRequestResponseTab(self, e):
+		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", self._DIALOG_TAB_1_NAME, 6, "Request", self.popUpListener)
+		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", self._DIALOG_TAB_1_NAME, 6, "Response", self.popUpListener)
+
+
+	def removeLastRequestResponseTab(self, e):
+		self.removeScrollPaneFromExistingTabbedPanel(self._DIALOG_TAB_1_NAME, "Request")
+		self.removeScrollPaneFromExistingTabbedPanel(self._DIALOG_TAB_1_NAME, "Response")
+
+
+	def removeScrollPaneFromExistingTabbedPanel(self, tabName, shortName):
 		longName = tabName + " " + shortName
 
 		tabPane = self._dictionaryOfPanels[longName].getComponents()[0]
 
-		nextShortName = shortName + str(tabPane.getTabCount() + 1)
+		if tabPane.getTabCount() > 1:
+			tabPane.remove(tabPane.getTabCount() - 1)
+
+		return
+
+
+	def createAndAddScrollPaneToExistingTabbedPanel(self, textType, editable, tabName, rowHeight, shortName, popUpListener = None):
+		longName = tabName + " " + shortName
+
+		tabPane = self._dictionaryOfPanels[longName].getComponents()[0]
+
+		nextShortName = shortName + " " + str(tabPane.getTabCount() + 1)
 		nextLongName = tabName + " " + nextShortName
 
-		self.createTextAndScrollPane(textType, editable, nextLongName, rowHeight, nextShortName)
+		self.createTextAndScrollPane(textType, editable, nextLongName, rowHeight, nextShortName, popUpListener)
 		tabPane.addTab(nextShortName, self._dictionaryOfScrollPanes[nextLongName])
 
 		return
 
 
-	def createTextAndScrollPaneAndPanel(self, textType, editable, tabName, rowHeight, shortName, tabbed = False):
+	def createTextAndScrollPaneAndPanel(self, textType, editable, tabName, rowHeight, shortName, tabbed = False, popUpListener = None):
 
 		# create unique name for dictionary items
 		longName = tabName + " " + shortName
 
-		self.createTextAndScrollPane(textType, editable, longName, rowHeight, shortName)
+		self.createTextAndScrollPane(textType, editable, longName, rowHeight, shortName, popUpListener)
 		self.addScrollPaneToPanel(shortName, longName, tabbed)
 		# return
 		return
@@ -261,7 +311,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 	#
 	# create text areas, text panes and scroll panes
 	#
-	def createTextAndScrollPane(self, textType, editable, longName, rowHeight, shortName):
+	def createTextAndScrollPane(self, textType, editable, longName, rowHeight, shortName, popUpListener):
 
 		# check if the type is a text area
 		if textType == "TextArea":
@@ -322,6 +372,10 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 			else:
 				# allow undo and redo for changes to the text
 				self.createUndoRedo(longName)
+
+			if popUpListener is not None:
+				self._dictionaryOfTextAreas[longName].addMouseListener(popUpListener)
+				#self._dictionaryOfTextAreas[longName].addMouseListener(self.ModifyRequestPopUpListener(self.menu))
 
 		# check if the type is a text pane
 		elif textType == "TextPane":
@@ -768,12 +822,8 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 4, "Issue Background")
 		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 4, "Remediation Detail")
 		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 4, "Remediation Background")
-		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 6, "Request", True)
-		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 6, "Response", True)
-
-		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", tabName, 6, "Request")
-		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", tabName, 6, "Response")
-		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", tabName, 6, "Response")
+		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 6, "Request", True, self.popUpListener)
+		self.createTextAndScrollPaneAndPanel("TextArea", "editableY", tabName, 6, "Response", True, self.popUpListener)
 
 		# create combo boxes and panels for main tab
 		self.createComboBoxAndPanel(tabName, "Severity")
@@ -1175,8 +1225,26 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		issueBackground = self._dictionaryOfTextAreas[self._DIALOG_TAB_1_NAME + " Issue Background"].getText()
 		remediationDetail = self._dictionaryOfTextAreas[self._DIALOG_TAB_1_NAME + " Remediation Detail"].getText()
 		remediationBackground = self._dictionaryOfTextAreas[self._DIALOG_TAB_1_NAME + " Remediation Background"].getText()
-		request = self._dictionaryOfTextAreas[self._DIALOG_TAB_1_NAME + " Request"].getText()
-		response = self._dictionaryOfTextAreas[self._DIALOG_TAB_1_NAME + " Response"].getText()
+
+		requests = []
+		responses = []
+
+		responseTabPane = self._dictionaryOfPanels[self._DIALOG_TAB_1_NAME + " Response"].getComponent(0)
+		requestTabPane = self._dictionaryOfPanels[self._DIALOG_TAB_1_NAME + " Request"].getComponent(0)
+
+		for requestPane, responsePane in zip(requestTabPane.getComponents(), responseTabPane.getComponents()):
+			print(type(requestPane
+							.getViewport()
+							.getView()))
+			requests.append(requestPane
+							.getViewport()
+							.getView()
+							.getText())
+
+			responses.append(responsePane
+							.getViewport()
+							.getView()
+							.getText())
 
 		# check if there is a value in the port field
 		if port != "":
@@ -1267,7 +1335,9 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		highlight = None
 
 		# create array of http messages
-		httpMessages = [CustomIHttpRequestResponse(comment, highlight, httpService, request, response)]
+		httpMessages = []
+		for request, response in zip(requests, responses):
+			httpMessages.append(CustomIHttpRequestResponse(comment, highlight, httpService, request, response))
 
 		# create url
 		url = URL(protocol + "://" + host + ":" + unicode(port) + path)
