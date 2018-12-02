@@ -152,7 +152,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		menu = JPopupMenu()
 		menu.add(JMenuItem("Add Request/Response", actionPerformed=self.addNewRequestResponseTab))
 		menu.add(JMenuItem("Remove Last Request/Response", actionPerformed=self.removeLastRequestResponseTab))
-		self.popUpListener = self.ModifyRequestPopUpListener(self.menu)
+		self.popUpListener = self.ModifyRequestPopUpListener(menu)
 
 		# create main extension tab and issue selection tab for popup dialog
 		self.createMainTabOrIssueSelectionTab(self._MAIN_TAB_NAME)
