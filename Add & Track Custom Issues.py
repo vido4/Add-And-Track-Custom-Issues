@@ -72,8 +72,6 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 	# Need to implement all methods since Jython returns NonImplementedError on any not implemented method now
 	class ModifyRequestPopUpListener(MouseListener):
 
-		lastFocusedTextArea = None
-
 		def __init__(self, popUpMenu):
 			self.popUp = popUpMenu
 
@@ -91,10 +89,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 		def mouseReleased(self, e):
 			if e.getButton() == e.BUTTON3:
-				self.lastFocusedTextArea = e.getSource()
-				# print("Release source: " + str(e.getSource()))
 				self.popUp.show(e.getComponent(), e.getX(), e.getY())
-
 
 	def registerExtenderCallbacks(self, callbacks):
 
@@ -156,9 +151,9 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 		# popup menu for adding new requests/responses
 		self.menu = JPopupMenu()
-		self.menu.add(JMenuItem("Add Request/Response", actionPerformed=self.addNewRequestResponseTab))
-		self.menu.add(JMenuItem("Remove Last Request/Response", actionPerformed=self.removeLastRequestResponseTab))
-		self.menu.add(JMenuItem("Insert image", actionPerformed=self.insertImage))
+		self.menu.add(JMenuItem("Add Request & Response", actionPerformed=self.addNewRequestResponseTab))
+		self.menu.add(JMenuItem("Insert Image", actionPerformed=self.insertImage))
+		self.menu.add(JMenuItem("Remove last Request & Response", actionPerformed=self.removeLastRequestResponseTab))
 		self.popUpListener = self.ModifyRequestPopUpListener(self.menu)
 
 		# create main extension tab and issue selection tab for popup dialog
@@ -276,22 +271,23 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 		fc.setFileFilter(imageFilter)
 
-		returnVal = fc.showOpenDialog(JPanel())
+		longName = self._DIALOG_TAB_1_NAME + " " + "Request"
+		tabPane = self._dictionaryOfPanels[longName].getComponents()[0]
+
+		returnVal = fc.showOpenDialog(self._dictionaryOfTextAreas[longName]) #To always keep window in front
 
 		if returnVal == JFileChooser.APPROVE_OPTION:
 			imageFile = fc.getSelectedFile()
-			if self.popUpListener is None:
-				print("Couldn't get focus of textarea!")
-				return
-			focusedPanel = self.popUpListener.lastFocusedTextArea
-			caretPosition = focusedPanel.getCaretPosition()
-			imageSource = '<img src="data:image/png;base64,'
+			imageSource = 'img:'
 			imageSource += Base64.getEncoder().encodeToString(Files.readAllBytes(imageFile.toPath()))
-			imageSource += '">'
-			focusedPanel.insert(imageSource, caretPosition)
-			print("FocusedPanel: " + focusedPanel)
-			print("ImageSource: " + imageSource)
-			print("CaretPosition: " + caretPosition)
+
+			self.addNewRequestResponseTab(e)
+			tabsCount = tabPane.getTabCount()
+			tabPane.setSelectedIndex(tabsCount - 1)
+			focusedPanel = self._dictionaryOfTextAreas[longName + " " + str(tabsCount)]
+			focusedPanel.append(imageSource)
+
+
 
 	def addNewRequestResponseTab(self, e):
 		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", self._DIALOG_TAB_1_NAME, 6, "Request", self.popUpListener)
