@@ -51,7 +51,10 @@ from javax.swing.text import SimpleAttributeSet # for centering text in disabled
 from javax.swing.text import StyleConstants # for centering text in disabled issue name and severity text panes
 from javax.swing.undo import UndoManager # for undo and redo in text areas
 from javax.swing import JPopupMenu
-
+from javax.imageio import ImageIO
+from java.awt import KeyboardFocusManager
+from java.util import Base64
+from java.nio.file import Files
 import csv # for importing and exporting to and from csv
 import json # for importing and exporting to and from json
 import os # for splitting the file name and file extension when importing and exporting
@@ -65,10 +68,12 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 	#
 	# implement IBurpExtender when the extension is loaded
 	#
-
 	# Listener for request/response popUp menu
 	# Need to implement all methods since Jython returns NonImplementedError on any not implemented method now
 	class ModifyRequestPopUpListener(MouseListener):
+
+		lastFocusedTextArea = None
+
 		def __init__(self, popUpMenu):
 			self.popUp = popUpMenu
 
@@ -86,6 +91,8 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
 		def mouseReleased(self, e):
 			if e.getButton() == e.BUTTON3:
+				self.lastFocusedTextArea = e.getSource()
+				# print("Release source: " + str(e.getSource()))
 				self.popUp.show(e.getComponent(), e.getX(), e.getY())
 
 
@@ -151,6 +158,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		self.menu = JPopupMenu()
 		self.menu.add(JMenuItem("Add Request/Response", actionPerformed=self.addNewRequestResponseTab))
 		self.menu.add(JMenuItem("Remove Last Request/Response", actionPerformed=self.removeLastRequestResponseTab))
+		self.menu.add(JMenuItem("Insert image", actionPerformed=self.insertImage))
 		self.popUpListener = self.ModifyRequestPopUpListener(self.menu)
 
 		# create main extension tab and issue selection tab for popup dialog
@@ -261,6 +269,29 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		# return
 		return
 
+
+	def insertImage(self, e):
+		fc = JFileChooser()
+		imageFilter = FileNameExtensionFilter("Image files", ImageIO.getReaderFileSuffixes())
+
+		fc.setFileFilter(imageFilter)
+
+		returnVal = fc.showOpenDialog(JPanel())
+
+		if returnVal == JFileChooser.APPROVE_OPTION:
+			imageFile = fc.getSelectedFile()
+			if self.popUpListener is None:
+				print("Couldn't get focus of textarea!")
+				return
+			focusedPanel = self.popUpListener.lastFocusedTextArea
+			caretPosition = focusedPanel.getCaretPosition()
+			imageSource = '<img src="data:image/png;base64,'
+			imageSource += Base64.getEncoder().encodeToString(Files.readAllBytes(imageFile.toPath()))
+			imageSource += '">'
+			focusedPanel.insert(imageSource, caretPosition)
+			print("FocusedPanel: " + focusedPanel)
+			print("ImageSource: " + imageSource)
+			print("CaretPosition: " + caretPosition)
 
 	def addNewRequestResponseTab(self, e):
 		self.createAndAddScrollPaneToExistingTabbedPanel("TextArea", "editableY", self._DIALOG_TAB_1_NAME, 6, "Request", self.popUpListener)
@@ -1233,9 +1264,6 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 		requestTabPane = self._dictionaryOfPanels[self._DIALOG_TAB_1_NAME + " Request"].getComponent(0)
 
 		for requestPane, responsePane in zip(requestTabPane.getComponents(), responseTabPane.getComponents()):
-			print(type(requestPane
-							.getViewport()
-							.getView()))
 			requests.append(requestPane
 							.getViewport()
 							.getView()
